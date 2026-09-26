@@ -1,8 +1,8 @@
---[[ Spinach config — pure settings table. Sliders only write here. ]]
+--[[ Pengu config — pure settings table. Sliders only write here. ]]
 local Config = {}
 
-Config.Name = "Spinach"
-Config.Version = "0.3.0"
+Config.Name = "Pengu"
+Config.Version = "0.3.1"
 
 -- Player / movement
 Config.SpeedEnabled = false
@@ -17,7 +17,7 @@ Config.Noclip = false
 Config.InfJump = false
 
 -- Throw CONFIG ONLY
-Config.SuperThrow = false
+Config.SuperThrow = false -- legacy alias
 Config.ThrowMult = 3.5
 Config.StrengthValue = 3.5
 Config.SuperStrength = false

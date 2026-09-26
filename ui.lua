@@ -1,4 +1,4 @@
---[[ Spinach UI v0.3.0 — compact Cowin tabs + RusherHack-inspired floating panels ]]
+--[[ Pengu UI v0.3.0 — compact Cowin tabs + RusherHack-inspired floating panels ]]
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
@@ -13,7 +13,7 @@ local UI={
  Windows={},
  ActiveTab="MODULES",
 }
-local Config,TargetManager,Combat,Defense,PlayerController,Spinach
+local Config,TargetManager,Combat,Defense,PlayerController,Pengu
 
 local BG=Color3.fromRGB(11,11,14)
 local PANEL=Color3.fromRGB(17,17,21)
@@ -81,7 +81,7 @@ local function label(parent,text,height,color,size,bold)
  l.BackgroundTransparency=1
  l.Text=text
  l.TextColor3=color or TEXT
- l.Font=bold and Enum.Font.Code or Enum.Font.Code
+ l.Font=bold and Enum.Font.Gotham or Enum.Font.Gotham
  l.TextSize=size or 12
  l.TextXAlignment=Enum.TextXAlignment.Left
  l.Parent=parent
@@ -95,7 +95,7 @@ local function button(parent,name,cb)
  b.BorderSizePixel=0
  b.Text=name
  b.TextColor3=TEXT
- b.Font=Enum.Font.Code
+ b.Font=Enum.Font.Gotham
  b.TextSize=12
  b.AutoButtonColor=false
  b.Parent=parent
@@ -126,7 +126,7 @@ local function toggle(parent,name,key,cb)
  txt.BackgroundTransparency=1
  txt.Text=name
  txt.TextColor3=TEXT
- txt.Font=Enum.Font.Code
+ txt.Font=Enum.Font.Gotham
  txt.TextSize=12
  txt.TextXAlignment=Enum.TextXAlignment.Left
  txt.Parent=row
@@ -171,7 +171,7 @@ local function slider(parent,name,key,min,max,cb)
  n.BackgroundTransparency=1
  n.Text=name
  n.TextColor3=TEXT
- n.Font=Enum.Font.Code
+ n.Font=Enum.Font.Gotham
  n.TextSize=11
  n.TextXAlignment=Enum.TextXAlignment.Left
  n.Parent=f
@@ -181,7 +181,7 @@ local function slider(parent,name,key,min,max,cb)
  val.Position=UDim2.new(.67,0,0,2)
  val.BackgroundTransparency=1
  val.Text=tostring(Config[key])
- val.Font=Enum.Font.Code
+ val.Font=Enum.Font.Gotham
  val.TextSize=11
  val.TextXAlignment=Enum.TextXAlignment.Right
  val.Parent=f
@@ -259,7 +259,7 @@ local function module(parent,name,key,settingsBuilder,cb)
  txt.BackgroundTransparency=1
  txt.Text=name
  txt.TextColor3=TEXT
- txt.Font=Enum.Font.Code
+ txt.Font=Enum.Font.Gotham
  txt.TextSize=12
  txt.TextXAlignment=Enum.TextXAlignment.Left
  txt.Parent=row
@@ -271,7 +271,7 @@ local function module(parent,name,key,settingsBuilder,cb)
  arrow.BackgroundTransparency=1
  arrow.Text=settingsBuilder and ">" or "•"
  arrow.TextColor3=MUTED
- arrow.Font=Enum.Font.Code
+ arrow.Font=Enum.Font.Gotham
  arrow.TextSize=12
  arrow.Parent=row
 
@@ -344,7 +344,7 @@ local function panel(parent,title,x,builder)
  titleLabel.BackgroundTransparency=1
  titleLabel.Text=title:upper()
  titleLabel.TextColor3=TEXT
- titleLabel.Font=Enum.Font.Code
+ titleLabel.Font=Enum.Font.Gotham
  titleLabel.TextSize=13
  titleLabel.TextXAlignment=Enum.TextXAlignment.Left
  titleLabel.Parent=head
@@ -355,7 +355,7 @@ local function panel(parent,title,x,builder)
  collapse.BackgroundTransparency=1
  collapse.Text="−"
  collapse.TextColor3=MUTED
- collapse.Font=Enum.Font.Code
+ collapse.Font=Enum.Font.Gotham
  collapse.TextSize=13
  collapse.Parent=head
 
@@ -392,15 +392,13 @@ end
 
 local function buildModules(page)
  panel(page,"Combat",14,function(p)
-  module(p,"Super Throw","SuperThrow",function(s)
+  module(p,"Super Strength","SuperStrength",function(s)
    slider(s,"Strength","StrengthValue",1,10)
-   slider(s,"Throw Multiplier","ThrowMult",1,8)
-   toggle(s,"Super Strength","SuperStrength")
    toggle(s,"Fling Up","FlingUp")
    toggle(s,"Slam","Slam")
    toggle(s,"Void Fling","VoidFling")
    toggle(s,"Spin Fling","SpinFling")
-  end,function(v)if Combat then if v then Combat.EnableSuperThrow()else Combat.DisableSuperThrow()end end end)
+  end,function(v)if Combat then if v then Combat.EnableSuperStrength()else Combat.DisableSuperStrength()end end end)
   module(p,"Fling Aura","FlingAura",function(s)slider(s,"Range","AuraRange",8,80);slider(s,"Cooldown","AuraCD",.1,2)end)
   module(p,"Ragdoll Aura","RagdollAura")
   module(p,"Sit Aura","SitAura")
@@ -506,7 +504,7 @@ local function buildWhitelist(page)
   info.BorderSizePixel=0
   info.Text="  Whitelisted players are ignored by\n  targeting/combat where supported.\n\n  Auto Whitelist Friends uses your\n  Roblox friends list."
   info.TextColor3=MUTED
-  info.Font=Enum.Font.Code
+  info.Font=Enum.Font.Gotham
   info.TextSize=11
   info.TextXAlignment=Enum.TextXAlignment.Left
   info.TextYAlignment=Enum.TextYAlignment.Top
@@ -522,18 +520,18 @@ local function buildConfigs(page)
  end)
  panel(page,"Config",249,function(p)
   button(p,"Save Default",function()
-   local m=Spinach.Get("ConfigManager.lua")
-   if m then local ok,e=m.Save();Spinach.Notify("CONFIG",ok and "Saved" or tostring(e),not ok)end
+   local m=Pengu.Get("ConfigManager.lua")
+   if m then local ok,e=m.Save();Pengu.Notify("CONFIG",ok and "Saved" or tostring(e),not ok)end
   end)
   button(p,"Load Default",function()
-   local m=Spinach.Get("ConfigManager.lua")
-   if m then local ok,e=m.Load();Spinach.Notify("CONFIG",ok and "Loaded" or tostring(e),not ok)end
+   local m=Pengu.Get("ConfigManager.lua")
+   if m then local ok,e=m.Load();Pengu.Notify("CONFIG",ok and "Loaded" or tostring(e),not ok)end
   end)
   toggle(p,"Notifications","NotifEnabled")
   toggle(p,"Skip Intro","SkipIntro")
  end)
  panel(page,"Info",484,function(p)
-  label(p,"Spinach "..tostring(Config.Version or "?"),24,TEXT,12,true)
+  label(p,"Pengu",24,TEXT,12,true)
   label(p,"Right-click a module for settings.",20,MUTED,10)
   label(p,"Right-click a category to collapse.",20,MUTED,10)
   label(p,"Right Ctrl toggles the GUI.",20,MUTED,10)
@@ -558,7 +556,7 @@ local function buildGUI()
  UI.Windows={}
 
  UI.Gui=Instance.new("ScreenGui")
- UI.Gui.Name="SpinachUI"
+ UI.Gui.Name="PenguUI"
  UI.Gui.ResetOnSpawn=false
  UI.Gui.IgnoreGuiInset=true
  UI.Gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
@@ -584,22 +582,17 @@ local function buildGUI()
  brand.Size=UDim2.new(0,112,1,0)
  brand.Position=UDim2.new(0,10,0,0)
  brand.BackgroundTransparency=1
- brand.Text="SPINACH"
- brand.Font=Enum.Font.Code
+ brand.Text="Pengu"
+ brand.Font=Enum.Font.GothamBold
  brand.TextSize=15
  brand.TextXAlignment=Enum.TextXAlignment.Left
  brand.Parent=top
  accentBind(brand,"TextColor3")
 
+ -- version hidden (internal Config.Version only)
  local version=Instance.new("TextLabel")
- version.Size=UDim2.new(0,50,1,0)
- version.Position=UDim2.new(0,79,0,0)
- version.BackgroundTransparency=1
- version.Text="v"..tostring(Config.Version or "?")
- version.TextColor3=MUTED
- version.Font=Enum.Font.Code
- version.TextSize=9
- version.TextXAlignment=Enum.TextXAlignment.Left
+ version.Visible=false
+ version.Size=UDim2.new(0,0,0,0)
  version.Parent=top
 
  local pages={}
@@ -622,7 +615,7 @@ local function buildGUI()
   b.BorderSizePixel=0
   b.Text=name
   b.TextColor3=name==UI.ActiveTab and currentAccent() or MUTED
-  b.Font=Enum.Font.Code
+  b.Font=Enum.Font.Gotham
   b.TextSize=11
   b.AutoButtonColor=false
   b.Parent=top
@@ -652,13 +645,13 @@ local function buildGUI()
  bind(RunService.RenderStepped:Connect(refreshAccents))
 end
 
-function UI.Init(spinach)
- Spinach=spinach
- Config=spinach.Get("config.lua")
- TargetManager=spinach.Get("TargetManager.lua")
- Combat=spinach.Get("combat.lua")
- Defense=spinach.Get("defense.lua")
- PlayerController=spinach.Get("PlayerController.lua")
+function UI.Init(pengu)
+ Pengu=pengu
+ Config=pengu.Get("config.lua")
+ TargetManager=pengu.Get("TargetManager.lua")
+ Combat=pengu.Get("combat.lua")
+ Defense=pengu.Get("defense.lua")
+ PlayerController=pengu.Get("PlayerController.lua")
  Config.Accent=PURPLE
  buildGUI()
  if Config.ThirdPerson and PlayerController then PlayerController.SetThirdPerson(true) end
