@@ -1,321 +1,230 @@
---[[
-    Combat — Super Strength (RMB throw only) / auras / reach / Noclip Barrier
-    Super Strength NEVER fires on normal LMB drop / GrabParts destroy.
-    Only when module enabled + actively holding + MouseButton2.
-]]
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LP = Players.LocalPlayer
+--[[ Pengu Combat — FTAP grab tracking, RMB-only Super Strength, held-object barrier noclip ]]
+local Players=game:GetService("Players")
+local RunService=game:GetService("RunService")
+local UIS=game:GetService("UserInputService")
+local Workspace=game:GetService("Workspace")
+local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local LP=Players.LocalPlayer
 
-local Combat = {
-    GrabTrackConn = nil,
-    InputConn = nil,
-    HeldPart = nil,       -- BasePart currently welded via GrabParts
-    HeldModel = nil,      -- Model if any
-    BarrierSaved = {},    -- [BasePart] = original CanCollide
-    AuraLast = 0,
+local Combat={
+ Connections={},
+ GrabModels={},
+ HeldPart=nil,
+ HeldGrab=nil,
+ PendingThrow=nil,
+ BarrierSaved={},
+ AuraLast=0,
 }
 
-local Config = nil
-local TargetManager = nil
-local SpinachRef = nil
+local Config=nil
+local TargetManager=nil
+local Client=nil
 
-local function hrp()
-    return LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+local function own(c)table.insert(Combat.Connections,c);return c end
+local function root()return LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")end
+
+local function isMine(part)
+ return LP.Character and part and part:IsDescendantOf(LP.Character)
 end
 
-local function isLocalCharacterPart(part)
-    local c = LP.Character
-    return c and part and part:IsDescendantOf(c)
+local function playerCharacterFrom(part)
+ local m=part and part:FindFirstAncestorOfClass("Model")
+ if m and Players:GetPlayerFromCharacter(m) then return m end
+ return nil
 end
 
---- Valid throw target: player character part OR movable unanchored assembly. Never map/anchored/world/local body.
-local function isValidThrowTarget(part)
-    if not part or not part:IsA("BasePart") or not part.Parent then return false end
-    if isLocalCharacterPart(part) then return false end
-    if part:IsA("Terrain") then return false end
-    -- player character (other)
-    local model = part:FindFirstAncestorOfClass("Model")
-    if model then
-        local hum = model:FindFirstChildOfClass("Humanoid")
-        local root = model:FindFirstChild("HumanoidRootPart")
-        if hum and root and model ~= LP.Character then
-            return true
-        end
-    end
-    -- movable object: must be unanchored (or assembly has unanchored root)
-    if part.Anchored then return false end
-    -- reject if parent is Workspace directly as static name heuristics
-    local p = part.Parent
-    if p == Workspace then
-        return not part.Anchored
-    end
-    if model and model.Parent == Workspace then
-        -- only apply to unanchored parts in the model, not whole map models
-        return not part.Anchored
-    end
-    return not part.Anchored
+local function movable(part)
+ if not part or not part:IsA("BasePart") or not part.Parent or isMine(part) then return false end
+ local pc=playerCharacterFrom(part)
+ if pc then return true end
+ local ar=part.AssemblyRootPart or part
+ return ar and not ar.Anchored
 end
 
-local function collectAssemblyParts(part)
-    local parts = {}
-    if not part then return parts end
-    local model = part:FindFirstAncestorOfClass("Model")
-    if model and model ~= Workspace and model:FindFirstChildOfClass("Humanoid") then
-        for _, d in ipairs(model:GetDescendants()) do
-            if d:IsA("BasePart") then table.insert(parts, d) end
-        end
-        return parts
-    end
-    -- single part or small assembly: only unanchored BaseParts under same parent (not entire map)
-    local parent = part.Parent
-    if parent and parent:IsA("Model") and parent ~= Workspace then
-        for _, d in ipairs(parent:GetChildren()) do
-            if d:IsA("BasePart") and not d.Anchored then
-                table.insert(parts, d)
-            end
-        end
-        if #parts == 0 and not part.Anchored then table.insert(parts, part) end
-        return parts
-    end
-    if not part.Anchored then table.insert(parts, part) end
-    return parts
+local function partsFor(part)
+ local out={}
+ if not part then return out end
+ local pc=playerCharacterFrom(part)
+ if pc then
+  for _,d in ipairs(pc:GetDescendants()) do if d:IsA("BasePart") then table.insert(out,d) end end
+  return out
+ end
+ local model=part:FindFirstAncestorOfClass("Model")
+ if model and model~=Workspace then
+  for _,d in ipairs(model:GetDescendants()) do
+   if d:IsA("BasePart") and not d.Anchored then table.insert(out,d) end
+  end
+  if #out>0 then return out end
+ end
+ if not part.Anchored then table.insert(out,part) end
+ return out
 end
 
-local function applyForceToValid(part, force)
-    if not isValidThrowTarget(part) then return end
-    local parts = collectAssemblyParts(part)
-    for _, p in ipairs(parts) do
-        if p.Parent and not p.Anchored and not isLocalCharacterPart(p) then
-            p.AssemblyLinearVelocity = force
-        end
-    end
+local function mode()
+ if Config.FlingUp then return "up" end
+ if Config.Slam then return "slam" end
+ if Config.VoidFling then return "void" end
+ if Config.SpinFling then return "spin" end
+ return "forward"
 end
 
-local function computeForce(part, mode)
-    local cam = Workspace.CurrentCamera
-    if not cam then return Vector3.zero end
-    local dir = cam.CFrame.LookVector
-    if mode == "up" then dir = Vector3.new(0, 1, 0)
-    elseif mode == "slam" then dir = Vector3.new(dir.X * 0.15, -1, dir.Z * 0.15)
-    elseif mode == "void" then dir = Vector3.new(0, -1, 0)
-    end
-    local mass = 0.5
-    for _, p in ipairs(collectAssemblyParts(part)) do
-        mass = mass + p:GetMass()
-    end
-    if mass < 0.5 then mass = 0.5 end
-    local mult = Config.StrengthValue or Config.ThrowMult or 3.5
-    local force = dir * (750 / mass) * mult + dir * 20
-    if mode == "spin" then
-        force = force + Vector3.new(math.random(-25, 25), 12, math.random(-25, 25))
-    elseif mode == "slam" then
-        force = Vector3.new(dir.X * 20, -100, dir.Z * 20)
-    end
-    if force.Magnitude > 300 then force = force.Unit * 300 end
-    return force
+local function computeForce(part,throwMode)
+ local cam=Workspace.CurrentCamera
+ if not cam then return Vector3.zero end
+ local dir=cam.CFrame.LookVector
+ if throwMode=="up" then dir=Vector3.yAxis
+ elseif throwMode=="void" then dir=-Vector3.yAxis
+ elseif throwMode=="slam" then dir=Vector3.new(dir.X*.2,-1,dir.Z*.2).Unit end
+
+ local mass=0
+ for _,p in ipairs(partsFor(part)) do mass+=math.max(p:GetMass(),.05) end
+ mass=math.max(mass,.5)
+ local strength=tonumber(Config.StrengthValue) or 3.5
+ local speed=math.clamp(70+(strength*38)+(120/math.sqrt(mass)),90,420)
+ local force=dir*speed
+ if throwMode=="spin" then force+=Vector3.new(math.random(-20,20),18,math.random(-20,20)) end
+ return force
 end
 
---- Super Strength throw: ONLY called from RMB while holding
-function Combat.PerformSuperStrengthThrow()
-    if not Config or not Config.SuperStrength then return end
-    local part = Combat.HeldPart
-    if not part or not part.Parent then return end
-    if not isValidThrowTarget(part) then return end
-    local mode = "forward"
-    if Config.FlingUp then mode = "up"
-    elseif Config.Slam then mode = "slam"
-    elseif Config.VoidFling then mode = "void"
-    elseif Config.SpinFling then mode = "spin" end
-    local force = computeForce(part, mode)
-    applyForceToValid(part, force)
+local function applyThrow(part,throwMode)
+ if not Config.SuperStrength or not movable(part) then return end
+ local force=computeForce(part,throwMode)
+ for _,p in ipairs(partsFor(part)) do
+  if p.Parent and not p.Anchored and not isMine(p) then
+   p.AssemblyLinearVelocity=force
+   if throwMode=="spin" then p.AssemblyAngularVelocity=Vector3.new(0,35,0) end
+  end
+ end
 end
 
-function Combat.FlingPlayer(plr, mode)
-    if not TargetManager or not TargetManager.Valid(plr) then return end
-    local root = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        local force = computeForce(root, mode or "forward")
-        applyForceToValid(root, force)
-    end
+local function restoreBarrier()
+ for p,v in pairs(Combat.BarrierSaved) do
+  if p and p.Parent then pcall(function()p.CanCollide=v end)end
+ end
+ table.clear(Combat.BarrierSaved)
 end
 
-local function clearHeld()
-    Combat.restoreBarrier()
-    Combat.HeldPart = nil
-    Combat.HeldModel = nil
+local function applyBarrier()
+ if not Config.NoclipBarrier or not Combat.HeldPart or not movable(Combat.HeldPart) then
+  restoreBarrier()
+  return
+ end
+ for _,p in ipairs(partsFor(Combat.HeldPart)) do
+  if Combat.BarrierSaved[p]==nil then Combat.BarrierSaved[p]=p.CanCollide end
+  p.CanCollide=false
+ end
 end
 
-local function setHeldFromGrabParts(obj)
-    local gp = obj:FindFirstChild("GrabPart")
-    if not gp then return end
-    local weld = gp:FindFirstChild("WeldConstraint")
-    if not weld or not weld.Part1 then return end
-    local target = weld.Part1
-    if isLocalCharacterPart(target) then return end
-    Combat.HeldPart = target
-    Combat.HeldModel = target:FindFirstAncestorOfClass("Model")
-    if Config and Config.NoclipBarrier then
-        Combat.applyBarrier(target)
-    end
+local function grabTarget(model)
+ local gp=model:FindFirstChild("GrabPart") or model:WaitForChild("GrabPart",.5)
+ local weld=gp and (gp:FindFirstChild("WeldConstraint") or gp:FindFirstChildWhichIsA("WeldConstraint"))
+ return weld and weld.Part1 or nil
 end
 
-function Combat.applyBarrier(part)
-    Combat.restoreBarrier()
-    if not part then return end
-    for _, p in ipairs(collectAssemblyParts(part)) do
-        if p:IsA("BasePart") and not isLocalCharacterPart(p) then
-            Combat.BarrierSaved[p] = p.CanCollide
-            p.CanCollide = false
-        end
-    end
+local function registerGrab(model)
+ if model.Name~="GrabParts" or Combat.GrabModels[model] then return end
+ local target=grabTarget(model)
+ if not target or isMine(target) then return end
+ Combat.GrabModels[model]=target
+ Combat.HeldGrab=model
+ Combat.HeldPart=target
+ applyBarrier()
+
+ local c
+ c=model.AncestryChanged:Connect(function()
+  if model.Parent then return end
+  Combat.GrabModels[model]=nil
+
+  local wasTarget=Combat.HeldPart
+  if Combat.HeldGrab==model then
+   Combat.HeldGrab=nil
+   Combat.HeldPart=nil
+   restoreBarrier()
+  end
+
+  local pending=Combat.PendingThrow
+  if pending and pending.part==wasTarget and tick()<=pending.expires then
+   Combat.PendingThrow=nil
+   task.defer(function()
+    if pending.part and pending.part.Parent then applyThrow(pending.part,pending.mode) end
+   end)
+  end
+  if c then c:Disconnect() end
+ end)
+ own(c)
 end
 
-function Combat.restoreBarrier()
-    for p, orig in pairs(Combat.BarrierSaved) do
-        if typeof(p) == "Instance" and p.Parent then
-            pcall(function() p.CanCollide = orig end)
-        end
-    end
-    Combat.BarrierSaved = {}
+local function rmb(input,gpe)
+ if gpe or input.UserInputType~=Enum.UserInputType.MouseButton2 then return end
+ if not Config.SuperStrength or not Combat.HeldPart or not movable(Combat.HeldPart) then return end
+ -- Do NOT throw yet. Arm exactly one enhanced throw, then let FTAP's normal RMB release happen.
+ Combat.PendingThrow={part=Combat.HeldPart,mode=mode(),expires=tick()+.55}
 end
 
-function Combat.EnableSuperStrength()
-    -- tracking only; throw is on RMB
-    if Combat.GrabTrackConn then return end
-    Combat.GrabTrackConn = Workspace.ChildAdded:Connect(function(obj)
-        if obj.Name ~= "GrabParts" then return end
-        task.defer(function()
-            setHeldFromGrabParts(obj)
-            local c
-            c = obj.AncestryChanged:Connect(function()
-                if obj.Parent then return end
-                -- normal drop/release: do NOT throw
-                if Combat.HeldPart then
-                    local still = false
-                    for _, g in ipairs(Workspace:GetChildren()) do
-                        if g.Name == "GrabParts" and g ~= obj then
-                            local gp = g:FindFirstChild("GrabPart")
-                            local w = gp and gp:FindFirstChild("WeldConstraint")
-                            if w and w.Part1 == Combat.HeldPart then still = true break end
-                        end
-                    end
-                    if not still then clearHeld() end
-                end
-                if c then c:Disconnect() end
-            end)
-        end)
-    end)
-    -- also scan existing
-    for _, obj in ipairs(Workspace:GetChildren()) do
-        if obj.Name == "GrabParts" then setHeldFromGrabParts(obj) end
-    end
-    if not Combat.InputConn then
-        Combat.InputConn = UserInputService.InputBegan:Connect(function(input, gpe)
-            if gpe then return end
-            if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                if Config and Config.SuperStrength and Combat.HeldPart then
-                    Combat.PerformSuperStrengthThrow()
-                end
-            end
-        end)
-        if SpinachRef then table.insert(SpinachRef.Connections, Combat.InputConn) end
-    end
-    if SpinachRef then table.insert(SpinachRef.Connections, Combat.GrabTrackConn) end
-end
-
-function Combat.DisableSuperStrength()
-    if Combat.GrabTrackConn then
-        Combat.GrabTrackConn:Disconnect()
-        Combat.GrabTrackConn = nil
-    end
-    -- keep InputConn if we want barrier etc.; disconnect throw path by flag only
-    clearHeld()
-end
-
--- aliases for older UI hooks
+function Combat.EnableSuperStrength() Config.SuperStrength=true end
+function Combat.DisableSuperStrength() Config.SuperStrength=false;Combat.PendingThrow=nil end
 function Combat.EnableSuperThrow() Combat.EnableSuperStrength() end
 function Combat.DisableSuperThrow() Combat.DisableSuperStrength() end
 
-local function forceReach()
-    if not Config or not Config.GrabReach then return end
-    local ge = ReplicatedStorage:FindFirstChild("GrabEvents")
-    local ext = ge and ge:FindFirstChild("ExtendGrabLine")
-    pcall(function() if ext then ext:FireServer(Config.MaxGrabReach) end end)
+function Combat.FlingPlayer(plr,throwMode)
+ if not TargetManager or not TargetManager.Valid(plr) then return end
+ local r=plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+ if r then
+  local old=Config.SuperStrength
+  Config.SuperStrength=true
+  applyThrow(r,throwMode or "forward")
+  Config.SuperStrength=old
+ end
+end
+
+local function reachTick()
+ if not Config.GrabReach then return end
+ local ge=ReplicatedStorage:FindFirstChild("GrabEvents")
+ local ext=ge and ge:FindFirstChild("ExtendGrabLine")
+ if ext then pcall(function()ext:FireServer(Config.MaxGrabReach)end)end
 end
 
 local function auraTick()
-    if not Config then return end
-    local any = Config.FlingAura or Config.RagdollAura or Config.SitAura
-        or Config.SpinAura or Config.BringAura or Config.VoidAura
-    if not any then return end
-    if tick() - Combat.AuraLast < (Config.AuraCD or 0.4) then return end
-    Combat.AuraLast = tick()
-    local my = hrp()
-    if not my then return end
-    local n = 0
-    for _, p in ipairs(Players:GetPlayers()) do
-        if n >= (Config.AuraMax or 3) then break end
-        if not TargetManager or not TargetManager.Valid(p) then continue end
-        local r = p.Character.HumanoidRootPart
-        if (r.Position - my.Position).Magnitude > (Config.AuraRange or 25) then continue end
-        n = n + 1
-        if Config.FlingAura then Combat.FlingPlayer(p) end
-        if Config.RagdollAura then
-            local h = p.Character:FindFirstChildOfClass("Humanoid")
-            if h then h.PlatformStand = true end
-        end
-        if Config.SitAura then
-            local h = p.Character:FindFirstChildOfClass("Humanoid")
-            if h then h.Sit = true end
-        end
-        if Config.SpinAura then r.AssemblyAngularVelocity = Vector3.new(0, 30, 0) end
-        if Config.BringAura then r.CFrame = my.CFrame + my.CFrame.LookVector * 5 end
-        if Config.VoidAura then r.AssemblyLinearVelocity = Vector3.new(0, -120, 0) end
-    end
+ if not (Config.FlingAura or Config.SpinAura or Config.VoidAura) then return end
+ if tick()-Combat.AuraLast<(Config.AuraCD or .4) then return end
+ Combat.AuraLast=tick()
+ local me=root();if not me then return end
+ local count=0
+ for _,p in ipairs(Players:GetPlayers()) do
+  if count>=(Config.AuraMax or 3) then break end
+  if TargetManager and TargetManager.Valid(p) then
+   local r=p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+   if r and (r.Position-me.Position).Magnitude<=(Config.AuraRange or 25) then
+    count+=1
+    if Config.FlingAura then Combat.FlingPlayer(p,"forward")
+    elseif Config.SpinAura then Combat.FlingPlayer(p,"spin")
+    elseif Config.VoidAura then Combat.FlingPlayer(p,"void") end
+   end
+  end
+ end
 end
 
-local function barrierTick()
-    if not Config then return end
-    if Config.NoclipBarrier and Combat.HeldPart and Combat.HeldPart.Parent then
-        if next(Combat.BarrierSaved) == nil then
-            Combat.applyBarrier(Combat.HeldPart)
-        end
-    elseif next(Combat.BarrierSaved) ~= nil and not Config.NoclipBarrier then
-        Combat.restoreBarrier()
-    end
-end
-
-function Combat.Tick()
-    forceReach()
-    auraTick()
-    barrierTick()
-end
-
-function Combat.Init(spinach)
-    SpinachRef = spinach
-    Config = spinach.Get("config.lua")
-    TargetManager = spinach.Get("TargetManager.lua")
-    -- always track grabs for barrier + optional super strength
-    Combat.EnableSuperStrength()
-    if Config and not Config.SuperStrength then
-        -- tracking stays; throw gated by flag
-    end
-    spinach.Connect(RunService.Heartbeat, function()
-        Combat.Tick()
-    end)
+function Combat.Init(client)
+ Client=client;Config=client.Get("config.lua");TargetManager=client.Get("TargetManager.lua")
+ own(Workspace.ChildAdded:Connect(registerGrab))
+ own(UIS.InputBegan:Connect(rmb))
+ own(RunService.Heartbeat:Connect(function()
+  applyBarrier()
+  reachTick()
+  auraTick()
+  if Combat.PendingThrow and tick()>Combat.PendingThrow.expires then Combat.PendingThrow=nil end
+ end))
+ for _,o in ipairs(Workspace:GetChildren()) do if o.Name=="GrabParts" then task.defer(registerGrab,o) end end
 end
 
 function Combat.Destroy()
-    Combat.DisableSuperStrength()
-    if Combat.InputConn then
-        Combat.InputConn:Disconnect()
-        Combat.InputConn = nil
-    end
-    Combat.restoreBarrier()
+ restoreBarrier()
+ Combat.PendingThrow=nil
+ Combat.HeldPart=nil
+ Combat.HeldGrab=nil
+ table.clear(Combat.GrabModels)
+ for _,c in ipairs(Combat.Connections) do pcall(function()c:Disconnect()end)end
+ Combat.Connections={}
 end
 
 return Combat

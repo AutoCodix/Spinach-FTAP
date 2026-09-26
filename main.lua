@@ -4,7 +4,7 @@
     Raw: https://raw.githubusercontent.com/AutoCodix/Spinach-FTAP/main/main.lua
 ]]
 
-local VERSION = "0.3.1"
+local VERSION = "0.4.0"
 local BASE = "https://raw.githubusercontent.com/AutoCodix/Spinach-FTAP/main/"
 local CACHE_BUST = true
 
@@ -88,7 +88,7 @@ function Pengu.Destroy()
 end
 
 local function bootstrap()
-    notify("PENGU","v"..VERSION.." loading…",false)
+    notify("PENGU","Loading…",false)
     local failed=0
     for _,path in ipairs(LOAD_ORDER) do local _,err=loadModule(path);if err then failed+=1 end end
     local initOrder={"config.lua","ConfigManager.lua","TargetManager.lua","VisualManager.lua","PlayerController.lua","WorldController.lua","combat.lua","defense.lua","visuals.lua","toys.lua","misc.lua","ui.lua"}
@@ -99,7 +99,7 @@ local function bootstrap()
             if not ok then notify("PENGU INIT ERROR","Module: "..path.."\n"..tostring(err),true);failed+=1 end
         end
     end
-    if failed==0 then notify("PENGU","Ready v"..VERSION,false) else notify("PENGU","Loaded with "..failed.." error(s)",true) end
+    if failed==0 then notify("PENGU","Ready",false) else notify("PENGU","Loaded with "..failed.." error(s)",true) end
 end
 
 local ok,err=pcall(bootstrap)

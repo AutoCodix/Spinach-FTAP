@@ -2,7 +2,7 @@
 local Config = {}
 
 Config.Name = "Pengu"
-Config.Version = "0.3.1"
+Config.Version = "0.4.0"
 
 -- Player / movement
 Config.SpeedEnabled = false
@@ -95,6 +95,11 @@ Config.DistESP = false
 Config.HealthESP = false
 Config.TargetESP = false
 Config.ObjectESP = false
+Config.PCLDESP = false
+Config.BlackholeESP = false
+Config.GrabbedObjectESP = false
+Config.KickNotify = false
+Config.TargetTrace = false
 Config.Rainbow = false
 Config.ESPMaxDist = 400
 
