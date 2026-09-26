@@ -2,19 +2,21 @@
 local Config = {}
 
 Config.Name = "Spinach"
-Config.Version = "0.2.0"
+Config.Version = "0.3.0"
 
--- Player
+-- Player / movement
+Config.SpeedEnabled = false
 Config.WalkSpeed = 16
+Config.JumpEnabled = false
 Config.JumpPower = 50
+Config.Flight = false
 Config.FlightSpeed = 50
-Config.SpinSpeed = 2
+Config.CharSpin = false
+Config.SpinSpeed = 12
 Config.Noclip = false
 Config.InfJump = false
-Config.Flight = false
-Config.CharSpin = false
 
--- Throw CONFIG ONLY (never applied in slider callbacks)
+-- Throw CONFIG ONLY
 Config.SuperThrow = false
 Config.ThrowMult = 3.5
 Config.StrengthValue = 3.5
@@ -52,7 +54,7 @@ Config.BlobGrabAll = false
 Config.AntiGrab = false
 Config.AntiGrabGucci = false
 Config.AntiGucci = false
-Config.AntiGucciMode = "Normal" -- Normal | Aggressive
+Config.AntiGucciMode = "Normal"
 Config.AntiGucciInterval = 0.15
 Config.AntiGucciEmergencyOnly = true
 Config.AntiBlobman = false
@@ -71,17 +73,18 @@ Config.AntiSnowball = false
 Config.AntiPoison = false
 Config.AntiExplosion = false
 Config.DisableVoid = false
-Config.NoclipBarrier = false -- plot barrier; NOT character noclip
+Config.NoclipBarrier = false
 Config.AntiInvis = false
 Config.AutoReset = false
--- UNSUPPORTED / UNKNOWN (not implemented as fake behavior)
-Config.AntiNetworkOwnership = false -- UNKNOWN
-Config.NetOwnerSpam = false -- UNKNOWN
+Config.AntiNetworkOwnership = false
+Config.NetOwnerSpam = false
 
--- Camera / Third Person
+-- Camera
 Config.ThirdPerson = false
 Config.TPDistance = 8
-Config.TPShoulder = 2
+Config.TPMinZoom = 0.5
+Config.TPMaxZoom = 32
+Config.TPShoulder = 0
 Config.TPHeight = 1
 Config.TPCollision = true
 Config.FOV = 70
@@ -91,14 +94,24 @@ Config.PlayerESP = false
 Config.DistESP = false
 Config.HealthESP = false
 Config.TargetESP = false
+Config.ObjectESP = false
 Config.Rainbow = false
 Config.ESPMaxDist = 400
 
--- Settings
+-- World
+Config.Fullbright = false
+Config.NoFog = false
+Config.NoShadows = false
+Config.CustomTime = false
+Config.ClockTime = 14
+
+-- UI
+Config.RainbowUI = false
+Config.RainbowSpeed = 0.12
 Config.MenuKey = Enum.KeyCode.RightControl
 Config.SkipIntro = false
 Config.NotifEnabled = true
-Config.Accent = Color3.fromRGB(0, 200, 130)
+Config.Accent = Color3.fromRGB(119, 0, 255)
 Config.WhitelistEnabled = true
 Config.AutoWLFriends = true
 
