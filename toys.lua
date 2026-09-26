@@ -1,7 +1,4 @@
-local Module = {}
-
-function Module.Init()
-    print("[SPINACH] Module initialized")
-end
-
-return Module
+local Toys = {}
+function Toys.Init(spinach) end
+function Toys.Destroy() end
+return Toys
