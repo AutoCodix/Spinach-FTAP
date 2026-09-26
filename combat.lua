@@ -142,23 +142,21 @@ local function registerGrab(model)
    restoreBarrier()
   end
 
-  local pending=Combat.PendingThrow
-  if pending and pending.part==wasTarget and tick()<=pending.expires then
-   Combat.PendingThrow=nil
+  if Config and Config.SuperStrength and wasTarget and wasTarget.Parent then
+   local throwMode=mode()
    task.defer(function()
-    if pending.part and pending.part.Parent then applyThrow(pending.part,pending.mode) end
+    if wasTarget and wasTarget.Parent then applyThrow(wasTarget,throwMode) end
    end)
   end
+  Combat.PendingThrow=nil
   if c then c:Disconnect() end
  end)
  own(c)
 end
 
 local function rmb(input,gpe)
- if gpe or input.UserInputType~=Enum.UserInputType.MouseButton2 then return end
- if not Config.SuperStrength or not Combat.HeldPart or not movable(Combat.HeldPart) then return end
- -- Do NOT throw yet. Arm exactly one enhanced throw, then let FTAP's normal RMB release happen.
- Combat.PendingThrow={part=Combat.HeldPart,mode=mode(),expires=tick()+.55}
+ -- Old behavior restored: Super Strength triggers on normal grab release/drop.
+ -- RMB is not required.
 end
 
 function Combat.EnableSuperStrength() Config.SuperStrength=true end
@@ -207,12 +205,10 @@ end
 function Combat.Init(client)
  Client=client;Config=client.Get("config.lua");TargetManager=client.Get("TargetManager.lua")
  own(Workspace.ChildAdded:Connect(registerGrab))
- own(UIS.InputBegan:Connect(rmb))
  own(RunService.Heartbeat:Connect(function()
   applyBarrier()
   reachTick()
   auraTick()
-  if Combat.PendingThrow and tick()>Combat.PendingThrow.expires then Combat.PendingThrow=nil end
  end))
  for _,o in ipairs(Workspace:GetChildren()) do if o.Name=="GrabParts" then task.defer(registerGrab,o) end end
 end
