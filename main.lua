@@ -4,7 +4,7 @@
     Raw: https://raw.githubusercontent.com/AutoCodix/Spinach-FTAP/main/main.lua
 ]]
 
-local VERSION = "0.2.0"
+local VERSION = "0.3.0"
 local BASE = "https://raw.githubusercontent.com/AutoCodix/Spinach-FTAP/main/"
 local CACHE_BUST = true
 
@@ -47,7 +47,7 @@ local function notify(title, body, isError)
 end
 Spinach.Notify=notify
 
-local LOAD_ORDER={"config.lua","ConfigManager.lua","TargetManager.lua","VisualManager.lua","ui.lua","combat.lua","defense.lua","visuals.lua","toys.lua","misc.lua"}
+local LOAD_ORDER={"config.lua","ConfigManager.lua","TargetManager.lua","VisualManager.lua","PlayerController.lua","WorldController.lua","ui.lua","combat.lua","defense.lua","visuals.lua","toys.lua","misc.lua"}
 
 local function loadModule(path)
     if Spinach.Destroyed then return nil,"destroyed" end
@@ -86,7 +86,7 @@ local function bootstrap()
     notify("SPINACH","v"..VERSION.." loading…",false)
     local failed=0
     for _,path in ipairs(LOAD_ORDER) do local _,err=loadModule(path);if err then failed+=1 end end
-    local initOrder={"config.lua","ConfigManager.lua","TargetManager.lua","VisualManager.lua","combat.lua","defense.lua","visuals.lua","toys.lua","misc.lua","ui.lua"}
+    local initOrder={"config.lua","ConfigManager.lua","TargetManager.lua","VisualManager.lua","PlayerController.lua","WorldController.lua","combat.lua","defense.lua","visuals.lua","toys.lua","misc.lua","ui.lua"}
     for _,path in ipairs(initOrder) do
         local mod=Spinach.Modules[path]
         if type(mod)=="table" and type(mod.Init)=="function" then
