@@ -1,12 +1,8 @@
-local Config = {
-    Accent = Color3.fromRGB(0, 255, 170),
-    MenuKey = Enum.KeyCode.RightShift,
+print("[SPINACH/CONFIG] config.lua EXECUTED")
 
-    ThrowStrength = 3.5,
-    GrabReach = 30,
+local Config = {}
 
-    AntiGucci = false,
-    AntiLag = true,
-}
+Config.Name = "Spinach"
+Config.Version = "0.1-dev"
 
 return Config
